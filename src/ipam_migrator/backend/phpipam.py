@@ -34,6 +34,7 @@ from ipam_migrator.db.ip_address import IPAddress
 from ipam_migrator.db.object import Object
 from ipam_migrator.db.prefix import Prefix
 from ipam_migrator.db.vlan import VLAN
+from ipam_migrator.db.vrf import VRF
 
 from ipam_migrator.exception import APIOptionsError
 from ipam_migrator.exception import APIReadError
@@ -285,7 +286,7 @@ class PhpIPAM(BaseBackend):
                       read_ip_addresses=True,
                       read_prefixes=True,
                       read_vlans=True,
-                      read_vrfs=False):
+                      read_vrfs=True):
         '''
         Read a Database object from the API backend.
         '''
@@ -448,7 +449,35 @@ class PhpIPAM(BaseBackend):
         Read a dictionary of VRF objects from the API backend,
         '''
 
-        raise NotImplementedError()
+        vrfs = {}
+
+        self.logger.info("Searching for VRFS...")
+
+        if "OPTIONS" in self.api_controller_methods("vrfs")[("vrfs",)]:
+            for data in self.api_read("vrfs"):
+                i = data["id"]
+                vrfs[i] = self.vrf_get(data)
+                self.logger.debug("found {}".format(vrfs[i]))
+
+        else:
+            self.logger.info(
+                "NOTE: 'vlans' controller root 'GET' method not supported by API endpoint, "
+                "using iterative path (consider upgrading to phpIPAM 1.3+)",
+            )
+
+            for i in range(1, 4095):
+                try:
+                    vrfs[i] = self.vrf_get(self.api_read("vrf", i))
+                    self.logger.debug("found {}".format(vrfs[i]))
+                except APIReadError as err:
+                    if err.api_message == "VRF not found":
+                        continue
+                    else:
+                        raise
+
+        self.logger.info("Found {} VRFs.".format(len(vrfs)))
+
+        return vrfs
 
 
     #
@@ -619,5 +648,11 @@ class PhpIPAM(BaseBackend):
         '''
         Get a VRF object from the given data dictionary.
         '''
-
-        raise NotImplementedError()
+        print(data)
+        return VRF(
+            data["id"], # vrf_id
+            data["rd"], # rd
+            name=data["name"],
+            description=data["description"],
+            # Unused: domainId - L2 domain identifier (default 1 – default domain)
+        )

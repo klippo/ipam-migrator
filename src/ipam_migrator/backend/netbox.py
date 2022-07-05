@@ -444,7 +444,33 @@ class NetBox(BaseBackend):
         Write a dictionary of VRF objects to the API backend.
         '''
 
-        raise NotImplementedError()
+        self.logger.info("Writing VRFs...")
+
+        count = 0
+
+        vrfs_new = dict()
+        vrfs_old_to_new = dict()
+
+        for vrf in vrfs.values():
+            new_vrf = self.obj_write(
+                "vrfs",
+                {"rd": vrf.rd},
+                {
+                    "name": vrf.name,
+                    "description": vrf.description,
+                    "rd": vrf.rd,
+                },
+                self.vrf_get,
+            )
+
+            vrfs_new[new_vrf.id_get()] = new_vrf
+            vrfs_old_to_new[vrf.id_get()] = new_vrf.id_get()
+
+            count += 1
+
+        self.logger.info("Wrote {} VLANs.".format(count))
+
+        return (vrfs_new, vrfs_old_to_new)
 
 
     def vlans_write(self, vlans):

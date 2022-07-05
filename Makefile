@@ -50,8 +50,8 @@
 #
 
 # Parameters that can be changed.
-ifdef VIRTUALENV
-PREFIX = $(VIRTUALENV)
+ifdef VIRTUAL_ENV
+PREFIX = $(VIRTUAL_ENV)
 else
 PREFIX = /usr/local
 endif
