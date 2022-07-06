@@ -27,6 +27,9 @@ import datetime
 
 import requests
 
+from fqdn import FQDN
+
+
 from ipam_migrator.backend.base import BaseBackend
 
 from ipam_migrator.db.database import Database
@@ -373,7 +376,7 @@ class PhpIPAM(BaseBackend):
                     raise
 
         self.logger.info("Found {} prefixes.".format(len(prefixes)))
-
+        print(prefixes)
         return prefixes
 
 
@@ -614,17 +617,39 @@ class PhpIPAM(BaseBackend):
             # editDate - Date and time of last update
         )
 
-
     @staticmethod
     def ip_address_get(data):
         '''
         Get an IPAddress object from the given data dictionary.
         '''
 
+        hostname_fqdn_valid = False
+        dns_name_fqdn_valid = False
+
+        if data["hostname"] and FQDN(data["hostname"]).is_valid:
+            hostname = data["hostname"]
+            hostname_fqdn_valid = True
+
+        elif data["dns_name"] and FQDN(data["dns_name"]).is_valid:
+            hostname = data["dns_name"]
+            dns_name_fqdn_valid = True
+        else:
+            hostname = str("")
+
+        description = data["description"]
+        if not data["description"]:
+            if data["hostname"] and not hostname_fqdn_valid:
+                description = data["hostname"]
+            elif data["dns_name"] and not dns_name_fqdn_valid:
+                description = data["dns_name"]
+
+
         return IPAddress(
             data["id"], # address_id
             data["ip"], # address
-            description=data["description"],
+            dns_name=hostname,
+            description=description,
+
             # Unused:
             # subnetId - Id of subnet address belongs to
             # is_gateway - Defines if address is presented as gateway
@@ -648,7 +673,6 @@ class PhpIPAM(BaseBackend):
         '''
         Get a VRF object from the given data dictionary.
         '''
-        print(data)
         return VRF(
             data["id"], # vrf_id
             data["rd"], # rd

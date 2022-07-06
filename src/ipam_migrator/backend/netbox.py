@@ -24,6 +24,7 @@ phpIPAM database backend.
 
 
 import requests
+import textwrap
 
 from ipam_migrator.backend.base import BaseBackend
 
@@ -78,6 +79,7 @@ class HTTPTokenAuth(requests.auth.AuthBase):
         '''
 
         req.headers["Authorization"] = "Token {}".format(self.token)
+        req.headers['Content-Type'] = "application/json"
         return req
 
 
@@ -217,6 +219,7 @@ class NetBox(BaseBackend):
         '''
 
         self.api_authenticate()
+        print(data)
 
         req_type = args[0]
         if req_type != "POST" and req_type != "PUT":
@@ -229,10 +232,11 @@ class NetBox(BaseBackend):
         response = function(
             uri,
             auth=HTTPTokenAuth(self.token),
-            data=data,
+            json=data,
             verify=self.api_ssl_verify,
         )
 
+        print(response.text)
         if not response.text:
             raise APIReadError(response.status_code, "(empty response)")
 
@@ -292,7 +296,7 @@ class NetBox(BaseBackend):
                       read_ip_addresses=True,
                       read_prefixes=True,
                       read_vlans=True,
-                      read_vrfs=False):
+                      read_vrfs=True):
         '''
         Read a Database object from the API backend.
         '''
@@ -369,7 +373,11 @@ class NetBox(BaseBackend):
 
         if database.vlans:
             vlans_old = database.vlans
+            #print("here")
+            #print(vlans_old)
             vlans_new, vlans_old_to_new = self.vlans_write(vlans_old)
+            #print(vlans_new)
+            #print(vlans_old_to_new)
         else:
             vlans_old = {}
             vlans_new = {}
@@ -422,13 +430,13 @@ class NetBox(BaseBackend):
         current_objs = self.api_search("ipam", obj_type, **obj_search_params)
         current_obj = current_objs[0] if current_objs else None
 
-        if current_obj:
-            new_obj_data = self.api_put(
-                "ipam", obj_type, current_obj["id"],
-                data=obj_data,
-            )
-        else:
-            new_obj_data = self.api_post("ipam", obj_type, data=obj_data)
+#        if current_obj:
+#            new_obj_data = self.api_put(
+#                "ipam", obj_type, current_obj["id"],
+#                data=obj_data,
+#            )
+#        else:
+        new_obj_data = self.api_post("ipam", obj_type, data=obj_data)
         new_obj = obj_get_func(new_obj_data)
 
         if current_obj:
@@ -452,13 +460,14 @@ class NetBox(BaseBackend):
         vrfs_old_to_new = dict()
 
         for vrf in vrfs.values():
+            rd = '{rd}-{name}'.format(rd=vrf.rd, name=str(vrf.name).strip("-"))[:20]
             new_vrf = self.obj_write(
                 "vrfs",
                 {"rd": vrf.rd},
                 {
                     "name": vrf.name,
-                    "description": vrf.description,
-                    "rd": vrf.rd,
+                    "description": vrf.description if vrf.description else vrf.name,
+                    "rd": rd,
                 },
                 self.vrf_get,
             )
@@ -491,7 +500,7 @@ class NetBox(BaseBackend):
                 {"vid": vlan.vid},
                 {
                     "name": vlan.name,
-                    "description": vlan.description,
+                    "description": vlan.description if vlan.description else vlan.name,
                     "vid": vlan.vid,
                 },
                 self.vlan_get,
@@ -525,12 +534,15 @@ class NetBox(BaseBackend):
         prefixes_new = dict()
         prefixes_old_to_new = dict()
 
+#        self.logger.error(prefixes.values())
         for prefix in prefixes.values():
+#            for attr, value in prefix.__dict__.items():
+#                print(attr, value)
             new_prefix = self.obj_write(
                 "prefixes",
                 {"q": str(prefix.prefix)},
                 {
-                    "description": prefix.description,
+                    "description": prefix.description if prefix.description else str(""),
                     "prefix": str(prefix.prefix),
                     "is_pool": prefix.is_pool,
                     "vlan": vlans_old_to_new[prefix.vlan_id] if prefix.vlan_id else None,
@@ -566,6 +578,8 @@ class NetBox(BaseBackend):
         ip_addresses_old_to_new = dict()
 
         for ip_address in ip_addresses.values():
+            for attr, value in ip_address.__dict__.items():
+                print(attr, value)
             new_ip_address = self.obj_write(
                 "ip-addresses",
                 {"q": str(ip_address.address)},
@@ -573,6 +587,7 @@ class NetBox(BaseBackend):
                     "description": ip_address.description,
                     "address": str(ip_address.address),
                     "custom_fields": ip_address.custom_fields,
+                    "dns_name": ip_address.dns_name,
                     "vrf": vrfs_old_to_new[ip_address.vrf_id] if ip_address.vrf_id else None,
                 },
                 self.ip_address_get,

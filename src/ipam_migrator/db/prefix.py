@@ -56,6 +56,7 @@ class Prefix(Object):
         self.vrf_id = int(vrf_id) if vrf_id is not None else None
 
 
+
     def __str__(self):
         '''
         String representation of a Prefix.

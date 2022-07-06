@@ -38,6 +38,7 @@ class IPAddress(Object):
     def __init__(self,
                  address_id,
                  address,
+                 dns_name=None,
                  description=None,
                  custom_fields=None,
                  vrf_id=None):
@@ -52,6 +53,8 @@ class IPAddress(Object):
         self.address = ipaddress.ip_address(address)
         self.family = 6 if isinstance(self.address, ipaddress.IPv6Address) else 4
         self.custom_fields = custom_fields.copy() if custom_fields is not None else dict()
+        self.dns_name = str(dns_name) if dns_name else str("")
+        self.description = str(description) if description else str("")
 
         # Grouping fields, in ascending order of scale.
         self.vrf_id = int(vrf_id) if vrf_id is not None else None
@@ -75,6 +78,7 @@ class IPAddress(Object):
         return {
             "id": self.id_get(),
             "description": self.description,
+            "dns_name": self.dns_name,
 
             "address": str(self.address),
             "family": self.family,
